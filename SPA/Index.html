@@ -8,18 +8,55 @@
     <link href="Content/kendo/styles/kendo.default.mobile.min.css" rel="stylesheet" />
 
     <script src="Scripts/jquery.min.js"></script>
+    <script src="Scripts/jszip.min.js"></script>
     <script src="Scripts/kendo.all.min.js"></script>
-
+    <style>
+        .k-header.k-grid-toolbar {
+            background-color: #3343a4;
+        }
+    </style>
 </head>
 <body>
     <div id="grid"></div>
-
     <script>
+        var usersURL = "http://localhost:51639/api/users/";
+        var departmentsURL = "http://localhost:52040/api/departments/";
 
-        var usersURL = "http://localhost:51639/api/users";
-        var departmentsURL = "http://localhost:52040/api/departments";
+        var department = kendo.data.Model.define({
+            id: "Id",
+            fields: {
+                Id: { editable: false, type: "number" },
+                Title: { editable: false }
+            }
+        });
+
+        var departmentsDataSource = new kendo.data.DataSource({
+            //autoSync: true,
+            transport: {
+                read: {
+                    url: departmentsURL,
+                    dataType: "json"
+                }
+            },
+            schema: {
+                model: department
+            }
+        });
+
+        var departmentsList = [];
+
+
+
 
         $(document).ready(function () {
+
+            departmentsDataSource.fetch(function () {
+                var data = this.data();
+                console.log(data);
+                for (var i = 0; i < data.length; i++) {
+                    departmentsList[data[i].Id] = data[i].Title;
+                }
+            });
 
             var user = kendo.data.Model.define({
                 id: "Id",
@@ -27,16 +64,44 @@
                     Id: { editable: false, type: "number" },
                     UserName: { validation: { required: true } },
                     DepartmentId: { editable: true, type: "number" }
+                },
+                Department: function () {
+                    return departmentsList[this.DepartmentId];
                 }
+
             });
 
             var usersDataSource = new kendo.data.DataSource({
                 pageSize: 20,
-                autoSync: true,
+                //autoSync: true,
                 transport: {
                     read: {
                         url: usersURL,
                         dataType: "json"
+                    },
+                    create: {
+                        url: usersURL,
+                        dataType: "json",
+                        type: "POST"
+                    },
+                    update: {
+                        url: function (options) {
+                            return usersURL + options.Id;
+                        },
+                        dataType: "json",
+                        type: "PUT"
+                    },
+                    destroy: {
+                        url: function (options) {
+                            return usersURL + options.Id;
+                        },
+                        dataType: "json",
+                        type: "DELETE"
+                    },
+                    parameterMap: function (options, operation) {
+                        if (operation !== "read" && options.models) {
+                            return { models: kendo.stringify(options.models) };
+                        }
                     }
                 },
                 schema: {
@@ -52,11 +117,28 @@
                 columns: [
                     { field: "Id", title: "#", width: "180px" },
                     { field: "UserName", title: "User Name" },
-                    { field: "DepartmentId", title: "Department" },
+                    { field: 'DepartmentId', title: 'Department', editor: categoryDropDownEditor, template: "#=Department()#" }, 
                     { command: "destroy", title: " ", width: "150px" }],
                 editable: true
             });
+
         });
+
+        function categoryDropDownEditor(container, options) {
+            $('<input required name="' + options.field + '"/>')
+                .appendTo(container)
+                .kendoDropDownList({
+                    autoBind: false,
+                    dataTextField: "Title",
+                    dataValueField: "Id",
+                    dataSource: {
+                        type: "json",
+                        transport: {
+                            read: departmentsURL
+                        },
+                    }
+                });
+        }
 
     </script>
 </body>
